@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Quickbase Pipeline Watcher</title>
+</head>
+<body>
+  <h2>🔎 Monitoring Quickbase Pipeline...</h2>
+  <p id="status">Initializing...</p>
+
+  <script>
+    const QB_REALM = "janeladomundo.quickbase.com";
+    const API_TOKEN = "b26pdi_c2gw_0_b9e2jiydk7m8wkc6ksfwt43jjaq"; // Replace this after testing
+    const TABLE_ID = "btm2jg8mn";
+    const FIELD_ID = 82; // Field tracking pipeline status
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const RECORD_ID = urlParams.get('rid');
+
+    if (!RECORD_ID) {
+      document.getElementById("status").textContent = "❌ Missing ?rid= in URL.";
+      throw new Error("No record ID provided.");
+    }
+
+    async function checkStatus() {
+      try {
+        const res = await fetch(`https://${QB_REALM}/v1/records/query`, {
+          method: "POST",
+          headers: {
+            "QB-Realm-Hostname": QB_REALM,
+            "Authorization": `QB-USER-TOKEN ${API_TOKEN}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            from: TABLE_ID,
+            where: `{3.EX.${RECORD_ID}}`,
+            select: [FIELD_ID]
+          })
+        });
+
+        const data = await res.json();
+        const value = data?.data?.[0]?.[FIELD_ID]?.value;
+
+        if (value === "Terminado") {
+          document.getElementById("status").textContent = "✅ Terminado! Redirigiendo...";
+          setTimeout(() => {
+            window.location.href = `https://${QB_REALM}/db/${TABLE_ID}?a=er&rid=${RECORD_ID}`;
+          }, 1500);
+        } else if (value === "Procesando") {
+          document.getElementById("status").textContent = "⏳ Procesando...";
+          setTimeout(checkStatus, 3000); // recheck in 3 seconds
+        } else {
+          document.getElementById("status").textContent = `ℹ️ Estado actual: ${value}`;
+          setTimeout(checkStatus, 3000);
+        }
+
+      } catch (err) {
+        document.getElementById("status").textContent = "⚠️ Error checking Quickbase record.";
+        console.error(err);
+      }
+    }
+
+    checkStatus();
+  </script>
+</body>
+</html>
